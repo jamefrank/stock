@@ -1,0 +1,26 @@
+[project]
+name = "stock"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "typer (==0.16.1)",
+    "mootdx (==0.11.7) ; python_version >= \"3.10\" and python_version < \"4.0\""
+]
+
+[tool.poetry]
+packages = [{include = "stock", from = "src"}]
+
+
+[[tool.poetry.source]]
+name = "mirrors"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+priority = "primary"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

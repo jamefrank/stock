@@ -91,7 +91,22 @@ def my_update_day_data(output_dir=STOCK_DATA_DIR):
 
 @timing_decorator
 def check_limit_up(code: str):
-    csv_file_path = os.path.join(STOCK_DATA_DIR, f'{code}.csv')
-    df = pd.read_csv(csv_file_path, parse_dates=['date'], index_col='date')
+    LIMIT_UP_THRESH = 0.1
     
-    pass
+    csv_file_path = os.path.join(STOCK_DATA_DIR, f'{code}.csv')
+    df = pd.read_csv(csv_file_path, parse_dates=['datetime'], index_col='datetime')
+    
+    pre_close = df['close'].shift(1)
+    limit_up_close = (pre_close * (1 + LIMIT_UP_THRESH)).round(2)
+ 
+    b_close_limit_up = df['close'] >= limit_up_close
+    b_open_limit_up = df['open'] >= limit_up_close
+    b_high_limit_up = df['high'] >= limit_up_close
+    b_low_limit_up = df['low'] >= limit_up_close
+    
+    return b_open_limit_up, b_close_limit_up, b_low_limit_up, b_high_limit_up
+
+
+if __name__ == '__main__':
+    code = '000001'
+    check_limit_up(code)

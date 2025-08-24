@@ -83,19 +83,22 @@ def my_update_day_data(output_dir=STOCK_DATA_DIR):
             feed['MA5'] = feed['close'].rolling(window=5).mean().round(2)
             feed['MA10'] = feed['close'].rolling(window=10).mean().round(2)
             feed['MA20'] = feed['close'].rolling(window=20).mean().round(2)
+
+            b_open_limit_up, b_close_limit_up, b_low_limit_up, b_high_limit_up = check_limit_up(feed)
+            feed['oup'] = b_open_limit_up
+            feed['cup'] = b_close_limit_up
+            feed['lup'] = b_low_limit_up
+            feed['hup'] = b_high_limit_up
+
             output_dir and to_file(feed, os.path.join(output_dir, f'{code}.csv'))
         except Exception as e:
             print(f"❌ 更新 {code} 数据失败: {e}")
     pass
 
 
-@timing_decorator
-def check_limit_up(code: str):
+def check_limit_up(df: pd.DataFrame):
     LIMIT_UP_THRESH = 0.1
-    
-    csv_file_path = os.path.join(STOCK_DATA_DIR, f'{code}.csv')
-    df = pd.read_csv(csv_file_path, parse_dates=['datetime'], index_col='datetime')
-    
+
     pre_close = df['close'].shift(1)
     limit_up_close = (pre_close * (1 + LIMIT_UP_THRESH)).round(2)
  
@@ -106,7 +109,51 @@ def check_limit_up(code: str):
     
     return b_open_limit_up, b_close_limit_up, b_low_limit_up, b_high_limit_up
 
+@timing_decorator
+def check_extreme_points(code :str):
+    file_path = os.path.join(STOCK_DATA_DIR, f'{code}.csv')
+    df = pd.read_csv(file_path, parse_dates=['datetime'], index_col='datetime')
+    df['emax'] = df['high'].rolling(window=11, center=True).max() <= df['high']
+    df['emin'] = df['low'].rolling(window=11, center=True).min() >= df['low']
+
+    # 提取 emax=True 的 high 极大值
+    extreme_highs = df[df['emax']][['high']].rename(columns={'high': 'extreme_value'})
+    extreme_highs['extreme_type'] = 'max'
+
+    # 提取 emin=True 的 low 极小值
+    extreme_lows = df[df['emin']][['low']].rename(columns={'low': 'extreme_value'})
+    extreme_lows['extreme_type'] = 'min'
+
+    # 合并成一个 DataFrame
+    extremes = pd.concat([extreme_highs, extreme_lows]).sort_index()
+    extremes['group'] = (extremes['extreme_type'] != extremes['extreme_type'].shift()).cumsum()
+
+    def get_keep_index(group):
+        if group['extreme_type'].iloc[0] == 'max':
+            return group['extreme_value'].idxmax()  # 返回 datetime
+        else:
+            return group['extreme_value'].idxmin()  # 返回 datetime
+
+    # def get_keep_index(group):
+    #     if group['extreme_type'].iloc[0] == 'max':
+    #         max_val = group['extreme_value'].max()
+    #         # 在所有等于最大值的中，取 datetime 最晚的（即索引最大的）
+    #         return group[group['extreme_value'] == max_val].index.max()
+    #     else:
+    #         min_val = group['extreme_value'].min()
+    #         # 在所有等于最小值的中，取 datetime 最晚的
+    #         return group[group['extreme_value'] == min_val].index.max()
+        
+    # 获取每组要保留的 datetime 索引
+    keep_indices = extremes.groupby('group').apply(get_keep_index)
+    extremes = extremes.loc[keep_indices].drop('group', axis=1).sort_index()
+
+
+    # 显示所有行，不限制
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        print(extremes)
+    pass
 
 if __name__ == '__main__':
-    code = '000001'
-    check_limit_up(code)
+    code = '002217'
+    check_extreme_points(code)
